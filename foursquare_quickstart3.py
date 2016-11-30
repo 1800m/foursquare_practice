@@ -59,18 +59,17 @@ def get_credentials():
     return credentials
 
 def get_using_oauth(credentials, uri, params={}):
-    # http = httplib2.Http()
     http = credentials.authorize(httplib2.Http())
     params['oauth_token'] = credentials.access_token
     params['v'] = '20161114'
-    params['locale'] = 'ja'
-    params['m'] = 'foursquare'
     return http.request(uri+'?'+urllib.parse.urlencode(params))
 
-if __name__ == '__main__':
-    credentials = get_credentials()
-    result = get_using_oauth(credentials, 'https://api.foursquare.com/v2/users/self/checkins',{'limit':'5'})
+
+def get_checkins(): #自身のチェックインデータの取得
+    params = {'limit':'100', 'locale':'ja', 'm':'foursquare'}
+    result = get_using_oauth(credentials, 'https://api.foursquare.com/v2/users/self/checkins', params)
     data = json.loads(result[1].decode('utf-8'))
+
     checkins = data['response']['checkins']['items']
     for checkin in checkins:
         checkin_date = time.strftime("%m/%d(%a)", time.gmtime(checkin['createdAt']))
@@ -78,3 +77,54 @@ if __name__ == '__main__':
             checkin_date = checkin_date[1:]
         checkin_date = checkin_date.replace('/0','/')
         print('%s に %s へ行きました' % (checkin_date, checkin['venue']['name']))
+
+
+def get_venue_info(credentials, venue_id):   #ベニューIDを基にベニュー情報を取得
+    params = {}
+    result = get_using_oauth(credentials, 'https://api.foursquare.com/v2/venues/'+venue_id, params)
+    data = json.loads(result[1].decode('utf-8'))
+
+    venue_info = data['response']['venue']
+    # for venue_info in venue_infos:                  #str型 venue_info
+    #     print(venue_info)
+    rating = venue_info.get('rating')          #レーティング  空のリストに対するエラー処理の追加が必要
+    ratingSignals = venue_info.get('ratingSignals') #レーティング数かな？
+    createdAt = venue_info.get('createdAt')         #ベニューの登録日
+    tip = venue_info.get('tips')                    #ベニューの口コミ
+    print('レーティング は %s です' % (rating))
+    print('レーティング数 は %s です' % (ratingSignals))
+    print('ベニュー登録日 は %s です' % (createdAt))
+    print('口コミ は %s です' % (tip))
+        # print(venue_info)
+    # print(venue_infos)
+    # print(type(venue_infos))
+
+
+def search_venues(credentials): #ベニューの検索
+    params = {'limit':'5','near':'熊本','query':'ラーメン'}
+    result = get_using_oauth(credentials, 'https://api.foursquare.com/v2/venues/search', params)
+    data = json.loads(result[1].decode('utf-8'))
+
+    searches = data['response']['venues']   #検索に引っかかるベニュー数分の情報が格納
+    for search in searches:                 #dict型 search
+        id = search.get('id')               #ベニューID
+        name = search.get('name')           #ベニュー名
+        location = search.get('location')   #ベニューの地理情報
+        category = search.get('categories') #ベニューのカテゴリ情報
+        stat = search.get('stats')          #ベニューのチェックイン・ユーザ・口コミ数の情報
+        get_venue_info(credentials, id)
+        print()
+        #確認用
+        # print('ID %s は %s です' % (id, name))
+        # print('ロケーション情報 は %s です' % (location))
+        # print('カテゴリ情報 は %s です' % (category))
+        # print('チェックイン数とかの情報 は %s です' % (stat))
+
+    # print(searches)
+
+
+
+if __name__ == '__main__':
+    credentials = get_credentials()
+    # get_checkins()
+    search_venues(credentials)
